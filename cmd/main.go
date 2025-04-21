@@ -4,7 +4,7 @@ import (
 	"github.com/skiba-mateusz/ecom-api/internal/infra/config"
 	"github.com/skiba-mateusz/ecom-api/internal/infra/http"
 	"github.com/skiba-mateusz/ecom-api/internal/infra/http/handler"
-	"github.com/skiba-mateusz/ecom-api/internal/infra/persistance/postgres"
+	"github.com/skiba-mateusz/ecom-api/internal/infra/persistence/postgres"
 	"go.uber.org/zap"
 )
 
