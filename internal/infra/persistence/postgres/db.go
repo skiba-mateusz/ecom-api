@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+const (
+	QueryTimeoutDuration = 15 * time.Second
+)
+
 func New(addr string, maxOpenConns, maxIdleConns int, maxIdleTime string) (*sql.DB, error) {
 	db, err := sql.Open("postgres", addr)
 	if err != nil {

@@ -35,6 +35,19 @@ func (s *Server) Mount() http.Handler {
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/health", s.handlers.Health.CheckHealth)
+
+		r.Route("/products", func(r chi.Router) {
+			r.Post("/", s.handlers.Product.CreateProduct)
+
+			r.Route("/{id}", func(r chi.Router) {
+				r.Use(s.handlers.Product.ProductIdMiddleware)
+
+				r.Get("/", s.handlers.Product.GetProduct)
+				r.Put("/", s.handlers.Product.UpdateProduct)
+				r.Delete("/", s.handlers.Product.DeleteProduct)
+			})
+
+		})
 	})
 
 	return r

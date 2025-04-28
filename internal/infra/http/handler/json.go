@@ -2,8 +2,11 @@ package handler
 
 import (
 	"encoding/json"
+	"github.com/go-playground/validator/v10"
 	"net/http"
 )
+
+var validate = validator.New(validator.WithRequiredStructEnabled())
 
 type response struct {
 	Data any `json:"data"`
@@ -11,6 +14,14 @@ type response struct {
 
 type errorResponse struct {
 	Message string `json:"message"`
+}
+
+func readJSON(w http.ResponseWriter, r *http.Request, data any) error {
+	maxBytes := 1_048_578 // 1mb
+	r.Body = http.MaxBytesReader(w, r.Body, int64(maxBytes))
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(data)
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) error {

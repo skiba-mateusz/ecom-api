@@ -31,7 +31,7 @@ func Load() *Config {
 		Addr:         getString("DATABASE_ADDR", "postgres://admin:adminpassword@localhost:5432/ecom?sslmode=disable"),
 		MaxOpenConns: getInt("DATABASE_MAX_OPEN_CONNS", 30),
 		MaxIdleConns: getInt("DATABASE_MAX_IDLE_CONNS", 30),
-		MaxIdleTime:  getString("DATABASE_MAX_IDLE_TIME", "15min"),
+		MaxIdleTime:  getString("DATABASE_MAX_IDLE_TIME", "15m"),
 	}
 
 	return &Config{

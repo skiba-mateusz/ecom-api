@@ -1,5 +1,6 @@
 package handler
 
 type Handlers struct {
-	Health *HealthHandler
+	Health  *HealthHandler
+	Product *ProductHandler
 }

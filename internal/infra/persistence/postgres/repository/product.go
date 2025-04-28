@@ -1,0 +1,202 @@
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"github.com/skiba-mateusz/ecom-api/internal/app/domain"
+	"github.com/skiba-mateusz/ecom-api/internal/infra/persistence/postgres"
+)
+
+type ProductRepository struct {
+	db *sql.DB
+}
+
+func NewProductRepository(db *sql.DB) *ProductRepository {
+	return &ProductRepository{
+		db: db,
+	}
+}
+
+func (r *ProductRepository) GetById(ctx context.Context, id int64) (*domain.Product, error) {
+	query := `
+		SELECT 
+			p.id, p.name, p.slug, p.description, p.price, p.sale_price, p.stock, p.category_id, p.brand_id, p.created_at, p.updated_at,
+			b.id, b.name, b.slug, b.description, b.logo_url
+		FROM products p
+		LEFT JOIN brands b on p.brand_id = b.id
+		WHERE p.id = $1 AND p.is_active = true;
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, postgres.QueryTimeoutDuration)
+	defer cancel()
+
+	var product domain.Product
+	product.Category = &domain.Category{}
+	product.Brand = &domain.Brand{}
+
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&product.Id,
+		&product.Name,
+		&product.Slug,
+		&product.Description,
+		&product.Price,
+		&product.SalePrice,
+		&product.Stock,
+		&product.CategoryId,
+		&product.BrandId,
+		&product.CreatedAt,
+		&product.UpdatedAt,
+		&product.Brand.Id,
+		&product.Brand.Name,
+		&product.Brand.Slug,
+		&product.Brand.Description,
+		&product.Brand.LogoUrl,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, domain.ErrNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return &product, nil
+}
+
+func (r *ProductRepository) Create(ctx context.Context, product *domain.Product) error {
+	query := `
+		INSERT INTO 
+		    products (name, slug, description, price, sale_price, stock, category_id, brand_id)
+		VALUES 
+		    ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING
+			id, created_at, updated_at;
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, postgres.QueryTimeoutDuration)
+	defer cancel()
+
+	err := r.db.QueryRowContext(
+		ctx,
+		query,
+		product.Name,
+		product.Slug,
+		product.Description,
+		product.Price,
+		product.SalePrice,
+		product.Stock,
+		product.CategoryId,
+		product.BrandId,
+	).
+		Scan(
+			&product.Id,
+			&product.CreatedAt,
+			&product.UpdatedAt,
+		)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *ProductRepository) Delete(ctx context.Context, id int64) error {
+	query := `
+		UPDATE products SET is_active = false WHERE id = $1;
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, postgres.QueryTimeoutDuration)
+	defer cancel()
+
+	res, err := r.db.ExecContext(ctx, query, id)
+
+	if err != nil {
+		return err
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return domain.ErrNotFound
+	}
+
+	return nil
+}
+
+func (r *ProductRepository) Update(ctx context.Context, product *domain.Product) error {
+	query := `
+		UPDATE 
+		    products 
+		SET
+		    name = $1,
+		    slug = $2,
+		    description = $3,
+		    price = $4,
+		    sale_price = $5,
+		    stock = $6,
+		    category_id = $7,
+		    brand_id = $8,
+			updated_at = $9
+		where 
+		    id = $10
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, postgres.QueryTimeoutDuration)
+	defer cancel()
+
+	res, err := r.db.ExecContext(
+		ctx,
+		query,
+		product.Name,
+		product.Slug,
+		product.Description,
+		product.Price,
+		product.SalePrice,
+		product.Stock,
+		product.CategoryId,
+		product.BrandId,
+		product.UpdatedAt,
+		product.Id,
+	)
+	if err != nil {
+		return err
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return domain.ErrNotFound
+	}
+
+	return nil
+}
+
+func (r *ProductRepository) SlugExists(ctx context.Context, candidate string) (bool, error) {
+	query := `
+		SELECT EXISTS (SELECT 1 FROM products WHERE slug = $1);
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, postgres.QueryTimeoutDuration)
+	defer cancel()
+
+	var exists bool
+	err := r.db.QueryRowContext(ctx, query, candidate).Scan(&exists)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return false, nil
+		default:
+			return false, err
+		}
+	}
+
+	return exists, nil
+}
