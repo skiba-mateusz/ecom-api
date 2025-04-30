@@ -69,3 +69,7 @@ func (s *ProductService) Update(ctx context.Context, product *domain.Product) er
 
 	return s.productRepo.Update(ctx, product)
 }
+
+func (s *ProductService) List(ctx context.Context, query domain.PaginatedProductsQuery) ([]domain.ProductSummary, domain.Meta, error) {
+	return s.productRepo.List(ctx, query)
+}

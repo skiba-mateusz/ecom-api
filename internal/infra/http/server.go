@@ -37,6 +37,7 @@ func (s *Server) Mount() http.Handler {
 		r.Get("/health", s.handlers.Health.CheckHealth)
 
 		r.Route("/products", func(r chi.Router) {
+			r.Get("/", s.handlers.Product.ListProducts)
 			r.Post("/", s.handlers.Product.CreateProduct)
 
 			r.Route("/{id}", func(r chi.Router) {

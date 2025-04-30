@@ -4,8 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/lib/pq"
 	"github.com/skiba-mateusz/ecom-api/internal/app/domain"
 	"github.com/skiba-mateusz/ecom-api/internal/infra/persistence/postgres"
+	"math"
+	"strconv"
+	"strings"
 )
 
 type ProductRepository struct {
@@ -199,4 +203,121 @@ func (r *ProductRepository) SlugExists(ctx context.Context, candidate string) (b
 	}
 
 	return exists, nil
+}
+
+func (r *ProductRepository) List(ctx context.Context, q domain.PaginatedProductsQuery) ([]domain.ProductSummary, domain.Meta, error) {
+	var query strings.Builder
+	query.WriteString(`
+		SELECT 
+			p.id, p.name, p.slug, p.price, p.sale_price, p.stock, p.category_id, p.brand_id,
+			c.id, c.name, c.slug,
+			b.id, b.name, b.slug,
+			COUNT(p.id) OVER()
+		FROM products p
+		LEFT JOIN brands b ON p.brand_id = b.id
+		LEFT JOIN categories c ON p.category_id = c.id 
+		WHERE p.is_active = true AND (p.name ILIKE '%' || $1 || '%' OR p.description ILIKE '%' || $1 || '%')	
+	`)
+
+	params := []any{q.Search}
+	paramIndex := len(params) + 1
+
+	if len(q.Categories) > 0 {
+		query.WriteString(`
+			AND p.category_id in (
+				WITH RECURSIVE category_tree AS (
+					SELECT id FROM categories
+					WHERE slug = ANY($` + strconv.Itoa(paramIndex) + `)
+					UNION ALL
+					SELECT c.id FROM categories
+					JOIN category_tree ct ON c.parent_id = ct.id
+				)
+				SELECT id FROM category_tree
+			)
+		`)
+		params = append(params, pq.Array(q.Categories))
+		paramIndex++
+	}
+
+	query.WriteString("GROUP BY p.id, c.id, b.id")
+
+	validSortFields := map[string]string{
+		"name":  "p.name",
+		"price": "p.price",
+		"stock": "p.stock",
+	}
+
+	sortField, exists := validSortFields[q.SortField]
+	if !exists {
+		sortField = "p.name"
+	}
+
+	query.WriteString(" ORDER BY ")
+	query.WriteString(sortField)
+	query.WriteString(" ")
+	query.WriteString(q.SortDirection)
+
+	query.WriteString(" LIMIT $")
+	query.WriteString(strconv.Itoa(paramIndex))
+	params = append(params, q.Limit)
+	paramIndex++
+
+	query.WriteString(" OFFSET $")
+	query.WriteString(strconv.Itoa(paramIndex))
+	params = append(params, q.Offset)
+
+	ctx, cancel := context.WithTimeout(ctx, postgres.QueryTimeoutDuration)
+	defer cancel()
+
+	var products []domain.ProductSummary
+	var count int
+	rows, err := r.db.QueryContext(ctx, query.String(), params...)
+	if err != nil {
+		return nil, domain.Meta{}, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var product domain.ProductSummary
+		product.Category = &domain.CategorySummary{}
+		product.Brand = &domain.BrandSummary{}
+
+		err = rows.Scan(
+			&product.Id,
+			&product.Name,
+			&product.Slug,
+			&product.Price,
+			&product.SalePrice,
+			&product.Stock,
+			&product.CategoryId,
+			&product.BrandId,
+			&product.Category.Id,
+			&product.Category.Name,
+			&product.Category.Slug,
+			&product.Brand.Id,
+			&product.Brand.Name,
+			&product.Brand.Slug,
+			&count,
+		)
+		if err != nil {
+			return nil, domain.Meta{}, err
+		}
+
+		products = append(products, product)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, domain.Meta{}, err
+	}
+
+	currentPage := (q.Offset / q.Limit) + 1
+	totalPages := int(math.Ceil(float64(count) / float64(q.Limit)))
+	meta := domain.Meta{
+		TotalItems:  count,
+		CurrentPage: currentPage,
+		PageSize:    q.Limit,
+		TotalPages:  totalPages,
+	}
+
+	return products, meta, nil
 }

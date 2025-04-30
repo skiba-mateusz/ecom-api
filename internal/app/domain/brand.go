@@ -7,3 +7,9 @@ type Brand struct {
 	Description *string `json:"description"`
 	LogoUrl     *string `json:"logo_url"`
 }
+
+type BrandSummary struct {
+	Id   int64  `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}

@@ -72,13 +72,15 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	product := &domain.Product{
-		Name:        req.Name,
+		BaseProduct: domain.BaseProduct{
+			Name:       req.Name,
+			Stock:      req.Stock,
+			Price:      req.Price,
+			SalePrice:  req.SalePrice,
+			CategoryId: req.CategoryID,
+			BrandId:    req.BrandID,
+		},
 		Description: req.Description,
-		Stock:       req.Stock,
-		Price:       req.Price,
-		SalePrice:   req.SalePrice,
-		CategoryId:  req.CategoryID,
-		BrandId:     req.BrandID,
 	}
 
 	if err := h.productService.Create(r.Context(), product); err != nil {
@@ -134,14 +136,16 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	product := &domain.Product{
-		Id:          id,
-		Name:        req.Name,
+		BaseProduct: domain.BaseProduct{
+			Id:         id,
+			Name:       req.Name,
+			Stock:      req.Stock,
+			Price:      req.Price,
+			SalePrice:  req.SalePrice,
+			CategoryId: req.CategoryID,
+			BrandId:    req.BrandID,
+		},
 		Description: req.Description,
-		Stock:       req.Stock,
-		Price:       req.Price,
-		SalePrice:   req.SalePrice,
-		CategoryId:  req.CategoryID,
-		BrandId:     req.BrandID,
 	}
 
 	if err := h.productService.Update(r.Context(), product); err != nil {
@@ -155,6 +159,45 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := jsonResponse(w, http.StatusOK, product); err != nil {
+		internalServerError(w, r, err, h.logger)
+	}
+}
+
+func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
+	query := domain.PaginatedProductsQuery{
+		Offset:        0,
+		Limit:         20,
+		Search:        "",
+		SortField:     "name",
+		SortDirection: "desc",
+	}
+
+	query, err := query.Parse(r)
+	if err != nil {
+		badRequestResponse(w, r, err, h.logger)
+		return
+	}
+
+	if err = validate.Struct(query); err != nil {
+		badRequestResponse(w, r, err, h.logger)
+		return
+	}
+
+	products, meta, err := h.productService.List(r.Context(), query)
+	if err != nil {
+		internalServerError(w, r, err, h.logger)
+		return
+	}
+
+	productsWithMeta := struct {
+		Meta     domain.Meta             `json:"meta"`
+		Products []domain.ProductSummary `json:"products"`
+	}{
+		Meta:     meta,
+		Products: products,
+	}
+
+	if err = jsonResponse(w, http.StatusOK, productsWithMeta); err != nil {
 		internalServerError(w, r, err, h.logger)
 	}
 }
