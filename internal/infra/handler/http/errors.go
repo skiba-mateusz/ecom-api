@@ -17,5 +17,5 @@ func badRequestResponse(w http.ResponseWriter, r *http.Request, err error, logge
 
 func notFoundResponse(w http.ResponseWriter, r *http.Request, err error, logger *zap.SugaredLogger) {
 	logger.Warnw("not found response", "path", r.URL.Path, "method", r.Method, "error", err.Error())
-	_ = jsonErrorResponse(w, http.StatusInternalServerError, "not found")
+	_ = jsonErrorResponse(w, http.StatusNotFound, "not found")
 }

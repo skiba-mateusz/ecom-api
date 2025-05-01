@@ -207,7 +207,7 @@ func (h *ProductHandler) ProductIdMiddleware(next http.Handler) http.Handler {
 		idStr := chi.URLParam(r, "id")
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			internalServerError(w, r, err, h.logger)
+			badRequestResponse(w, r, err, h.logger)
 			return
 		}
 
