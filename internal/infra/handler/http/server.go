@@ -4,7 +4,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/skiba-mateusz/ecom-api/internal/infra/config"
-	"github.com/skiba-mateusz/ecom-api/internal/infra/http/handler"
 	"go.uber.org/zap"
 	"net/http"
 	"time"
@@ -13,10 +12,15 @@ import (
 type Server struct {
 	config   *config.Config
 	logger   *zap.SugaredLogger
-	handlers *handler.Handlers
+	handlers *Handlers
 }
 
-func NewServer(config *config.Config, logger *zap.SugaredLogger, handlers *handler.Handlers) *Server {
+type Handlers struct {
+	Health  *HealthHandler
+	Product *ProductHandler
+}
+
+func NewServer(config *config.Config, logger *zap.SugaredLogger, handlers *Handlers) *Server {
 	return &Server{
 		config:   config,
 		logger:   logger,

@@ -1,4 +1,4 @@
-package handler
+package http
 
 import (
 	"github.com/skiba-mateusz/ecom-api/internal/infra/config"
